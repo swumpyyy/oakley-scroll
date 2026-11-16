@@ -1,12 +1,17 @@
 // ───── Maschera in 3D dalle foto vere ─────
 // assets/goggle.bin è la forma 3D della maschera, ricavata dalle 12 foto (piattaforma girevole) con la camera
-// ricalibrata su migliaia di punti in comune tra foto vicine: sagome, superficie misurata per triangolazione
-// (cinghia, schiuma), cavità della lente interna, cinghia ad anello aperto in alto.
+// ricalibrata su migliaia di punti in comune tra foto vicine. Due parti:
+//  - corpo (montatura, lente, schiuma): superficie liscia che sfiora il contorno di ogni foto a metà di ogni
+//    faccia della sagoma e passa per i punti misurati per triangolazione (schiuma, montatura);
+//  - cinghia: nastro spesso 7 px lungo il percorso misurato su 600 mila punti, bordi dalle sagome.
 // A ogni angolo la maschera prende il colore dalle due foto più vicine, proiettate sulla forma con la
 // stessa camera che le ha scattate: agli angoli delle foto il risultato è la foto stessa. Tra due foto,
 // assets/flow.png dice di quanto si spostano i dettagli dall'una all'altra: le due proiezioni scivolano
 // l'una verso l'altra, così i dettagli coincidono e non ci sono doppi contorni. Dove le due foto restano diverse
-// (dettagli coperti in una delle due) si passa dall'una all'altra in fretta invece di sovrapporle.
+// (dettagli coperti in una delle due) si passa dall'una all'altra in fretta invece di sovrapporle; dove una foto
+// è trasparente (fuori dalla sua sagoma) conta solo l'altra.
+// La foto grande (n. 11) viene da un altro servizio fotografico, con la cinghia in un'altra posizione: la cinghia
+// prende il colore solo dalle altre 11.
 // Serve WebGL2; se manca, createGoggle3D restituisce null e il sito usa le foto in 2D.
 
 // Camera stimata dalle foto (tela 1000×500 px): distanza, inclinazione, angolo di ogni foto, spostamento
@@ -19,6 +24,7 @@ const GOGGLE_CAM = {
   crops: [[147, 42, 706, 416], [125, 41, 750, 418], [63, 46, 874, 408], [33, 55, 933, 390], [52, 45, 896, 410],
     [117, 40, 765, 420], [194, 39, 612, 422], [112, 41, 776, 418], [51, 45, 898, 409], [30, 56, 940, 388],
     [62, 46, 877, 408], [91.17, 59.45, 736.28, 412.72]],
+  hi: 11,   // la foto grande viene da un altro servizio fotografico: la cinghia lì è in un'altra posizione
 };
 
 function createGoggle3D(canvas) {
@@ -55,6 +61,8 @@ function createGoggle3D(canvas) {
     }
     gl.bindAttribLocation(p, 0, 'aPos');
     gl.bindAttribLocation(p, 1, 'aNrm');
+    gl.bindAttribLocation(p, 2, 'aPart');
+    gl.bindAttribLocation(p, 3, 'aLens');
     gl.linkProgram(p);
     if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
     const loc = {};
@@ -78,13 +86,19 @@ function createGoggle3D(canvas) {
   const mainProg = compile(`#version 300 es
     in vec3 aPos;
     in vec3 aNrm;    // normale morbida (media sui triangoli attorno al vertice)
+    in float aPart;  // 0 corpo, 1 cinghia
+    in float aLens;  // 0–1: lente a specchio (riconosciuta dal colore nelle foto frontali)
     uniform mat3 uR; uniform vec2 uOff;
     uniform vec2 uCenter; uniform float uScale; uniform float uRoll; uniform vec2 uViewport;
     out vec3 vPos;
     out vec3 vNrm;
     out vec2 vOut;   // punto nella tela della scena (serve a leggere il campo di spostamento)
+    flat out float vPart;
+    out float vLens;
     ${PROJECT}
     void main() {
+      vPart = aPart;
+      vLens = aLens;
       vec3 t = proj(uR, uOff, aPos);
       vOut = t.xy;
       vec2 d = (t.xy - vec2(499.5, 249.5)) * uScale;
@@ -101,8 +115,11 @@ function createGoggle3D(canvas) {
     in vec3 vPos;
     in vec3 vNrm;
     in vec2 vOut;
+    flat in float vPart;
+    in float vLens;
     uniform mat3 uR;               // camera della scena (per la direzione di vista)
     uniform mat3 uRA, uRB; uniform vec2 uOffA, uOffB; uniform float uLayerA, uLayerB, uW;
+    uniform mat3 uRA2, uRB2; uniform vec2 uOffA2, uOffB2; uniform float uLayerA2, uLayerB2, uW2, uFlow2;   // coppia per la cinghia
     uniform float uPair, uFlowOn, uDebug;
     uniform sampler2DArray uTex;   // le 12 foto
     uniform sampler2DArray uDep;   // profondità vista da ogni foto
@@ -134,45 +151,60 @@ function createGoggle3D(canvas) {
       return texture(uTex, vec3(p, layer));
     }
     void main() {
-      vec3 ta = proj(uRA, uOffA, vPos);
-      vec3 tb = proj(uRB, uOffB, vPos);
+      // la cinghia prende il colore solo dalle 11 foto dello stesso servizio
+      bool st = vPart > 0.5;
+      mat3 RA = st ? uRA2 : uRA, RB = st ? uRB2 : uRB;
+      vec2 offA = st ? uOffA2 : uOffA, offB = st ? uOffB2 : uOffB;
+      float LA = st ? uLayerA2 : uLayerA, LB = st ? uLayerB2 : uLayerB, W = st ? uW2 : uW;
+      vec3 ta = proj(RA, offA, vPos);
+      vec3 tb = proj(RB, offB, vPos);
       vec2 fl = vec2(0.0);
       if (uFlowOn > 0.5) {
         vec2 c = vec2(vOut.x / 1000.0, (uPair + clamp(vOut.y / 500.0, 0.004, 0.996)) / ${N}.0);
         fl = (texture(uFlow, c).rg * 255.0 - 128.0) / 2.0;
       }
-      vec4 a = photo(uLayerA, ta.xy + uW * fl);
-      vec4 b = photo(uLayerB, tb.xy - (1.0 - uW) * fl);
+      if (st && uFlow2 < 0.5) fl = vec2(0.0);   // la cinghia salta la foto grande: lo spostamento misurato non vale
+      vec4 a = photo(LA, ta.xy + W * fl);
+      vec4 b = photo(LB, tb.xy - (1.0 - W) * fl);
       // ogni foto conta in base a quanto vede di fronte la superficie: quelle che la vedono di taglio
       // la stirerebbero (strisciate), quindi pesano poco
       vec3 n = normalize(vNrm);
       vec3 dirOut = vec3(0.0, 0.0, 1.0) * uR;
       if (dot(n, dirOut) < 0.0) n = -n;
-      float ca = dot(n, vec3(0.0, 0.0, 1.0) * uRA), cb = dot(n, vec3(0.0, 0.0, 1.0) * uRB);
+      float ca = dot(n, vec3(0.0, 0.0, 1.0) * RA), cb = dot(n, vec3(0.0, 0.0, 1.0) * RB);
       // peso continuo (coseno): a parità di distanza in angolo vince la foto che vede la superficie più di fronte
       float fa = max(smoothstep(0.05, 0.3, ca) * ca, 0.002), fb = max(smoothstep(0.05, 0.3, cb) * cb, 0.002);
-      float wa = (1.0 - uW) * seen(uLayerA, ta) * fa, wb = uW * seen(uLayerB, tb) * fb;
-      if (wa + wb < 1e-4) { wa = 1.0 - uW; wb = uW; }   // nessuna delle due lo vede: si usa comunque la più vicina
+      // dove una foto è trasparente (fuori dalla sua sagoma) conta l'altra: niente buchi né bordi sfrangiati
+      float ga = (1.0 - W) * seen(LA, ta) * fa, gb = W * seen(LB, tb) * fb;   // quanto ogni foto vede questo punto
+      float wa = ga * smoothstep(0.02, 0.5, a.a);
+      float wb = gb * smoothstep(0.02, 0.5, b.a);
+      if (wa + wb < 1e-4) { wa = 1.0 - W; wb = W; }   // nessuna delle due lo vede: si usa comunque la più vicina
       float wB = wb / (wa + wb);
       // dove le due foto non combaciano, sovrapporle darebbe doppi contorni: lì si passa dall'una all'altra
       // più in fretta, attorno a metà. Il disaccordo si misura sulle foto sfocate (mipmap), così è morbido.
-      vec2 pa = (ta.xy + uW * fl + 0.5) / vec2(1000.0, 500.0), pb = (tb.xy - (1.0 - uW) * fl + 0.5) / vec2(1000.0, 500.0);
-      vec4 aS = textureLod(uTex, vec3(pa, uLayerA), 2.5);
-      vec4 bS = textureLod(uTex, vec3(pb, uLayerB), 2.5);
+      vec2 pa = (ta.xy + W * fl + 0.5) / vec2(1000.0, 500.0), pb = (tb.xy - (1.0 - W) * fl + 0.5) / vec2(1000.0, 500.0);
+      vec4 aS = textureLod(uTex, vec3(pa, LA), 2.5);
+      vec4 bS = textureLod(uTex, vec3(pb, LB), 2.5);
       // sulla lente (superficie rivolta in avanti) i riflessi cambiano da foto a foto e devono dissolversi:
       // lì il passaggio rapido vale solo per il dettaglio stampato (scritte, logo)
       float detail = clamp((length(a - aS) + length(b - bS)) * 5.0 - 0.1, 0.0, 1.0);
-      float lensLike = smoothstep(0.45, 0.75, n.z);
+      float lensLike = smoothstep(0.2, 0.8, vLens);
       // disaccordo anche sui dettagli fini (scritte piccole spostate di pochi px), allargato ai vicini così una
       // lettera passa tutta insieme da una foto all'altra invece di strapparsi
       float fine = 0.0;
       for (int k = 0; k < 3; k++) {
         vec2 o = vec2(float(k - 1) * 5.0, 0.0) / vec2(1000.0, 500.0);   // le scritte scorrono in orizzontale
-        fine = max(fine, length(textureLod(uTex, vec3(pa + o, uLayerA), 1.0) - textureLod(uTex, vec3(pb + o, uLayerB), 1.0)));
+        fine = max(fine, length(textureLod(uTex, vec3(pa + o, LA), 1.0) - textureLod(uTex, vec3(pb + o, LB), 1.0)));
       }
       float dis = max(clamp(length(aS - bS) * 4.0 - 0.2, 0.0, 1.0), clamp(fine * 2.5 - 0.35, 0.0, 1.0) * (1.0 - lensLike)) * mix(1.0, detail, lensLike);
       wB = clamp((wB - 0.5) * (1.0 + 7.0 * dis) + 0.5, 0.0, 1.0);
       vec4 col = mix(a, b, wB);
+      // contorno: la trasparenza segue quanto ogni foto vede davvero il punto (rinforzata): vicino a una foto il bordo
+      // dell'altra non compare come doppio bordo, una foto che vede di taglio non buca la superficie, e dentro
+      // l'occhiale piccoli disallineamenti non fanno buchi
+      float al = ga + gb > 1e-4 ? (ga * a.a + gb * b.a) / (ga + gb) : (1.0 - W) * a.a + W * b.a;
+      al = clamp(al * 1.6, 0.0, 1.0);
+      if (col.a > 1e-4) col *= min(al, col.a) / col.a;
       if (uDebug > 0.5) col = vec4(vec3(0.25 + 0.7 * abs(dot(n, normalize(vec3(0.3, 0.6, 1.0) * uR)))), 1.0);   // solo per controlli: forma ombreggiata
       if (uDebug > 1.5) col = vec4(vec3(lensLike), 1.0);   // solo per la preparazione: dove sta la lente
       if (col.a < 0.02) discard;                        // trasparente: non copre ciò che sta dietro
@@ -191,10 +223,13 @@ function createGoggle3D(canvas) {
   // flow: immagine del campo di spostamento (facoltativa)
   function setup(images, mesh, flow) {
     const magic = String.fromCharCode(...new Uint8Array(mesh, 0, 4));
-    if (magic !== 'OAK4') throw new Error('goggle.bin: formato inatteso');
+    if (magic !== 'OAK6') throw new Error('goggle.bin: formato inatteso');
     const [nv, nf] = new Uint32Array(mesh.slice(4, 12));
     const pos = new Float32Array(mesh.slice(12, 12 + nv * 12));
-    const idx = new Uint16Array(mesh.slice(12 + nv * 12, 12 + nv * 12 + nf * 6));
+    const part = new Uint8Array(mesh.slice(12 + nv * 12, 12 + nv * 13));
+    const lens = new Uint8Array(mesh.slice(12 + nv * 13, 12 + nv * 14));
+    const io = 12 + nv * 14 + ((4 - ((2 * nv) % 4)) % 4);
+    const idx = new Uint16Array(mesh.slice(io, io + nf * 6));
     count = idx.length;
     gl.bindVertexArray(vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
@@ -218,6 +253,14 @@ function createGoggle3D(canvas) {
     gl.bufferData(gl.ARRAY_BUFFER, nrm, gl.STATIC_DRAW);
     gl.enableVertexAttribArray(1);
     gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    gl.bufferData(gl.ARRAY_BUFFER, part, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(2);
+    gl.vertexAttribPointer(2, 1, gl.UNSIGNED_BYTE, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    gl.bufferData(gl.ARRAY_BUFFER, lens, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(3);
+    gl.vertexAttribPointer(3, 1, gl.UNSIGNED_BYTE, true, 0, 0);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer());
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, idx, gl.STATIC_DRAW);
 
@@ -291,13 +334,17 @@ function createGoggle3D(canvas) {
     return ok;
   }
 
-  // coppia di foto attorno all'angolo a (gradi 0–360) e posizione tra le due (0–1)
-  function pairAt(a) {
-    for (let i = 0; i < N; i++) {
-      const a0 = C.angles[i], a1 = i + 1 < N ? C.angles[i + 1] : 360 + C.angles[0];
-      if (a >= a0 && a < a1) return [i, (i + 1) % N, (a - a0) / (a1 - a0)];
+  // coppia di foto attorno all'angolo a (gradi 0–360) e posizione tra le due (0–1);
+  // skipHi: senza la foto grande (per la cinghia)
+  const ALL = C.angles.map((_, i) => i), KSET = ALL.filter((i) => i !== C.hi);
+  function pairAt(a, skipHi) {
+    const L = skipHi ? KSET : ALL;
+    for (let n = 0; n < L.length; n++) {
+      const i = L[n], j = L[(n + 1) % L.length];
+      const a0 = C.angles[i], a1 = n + 1 < L.length ? C.angles[j] : 360 + C.angles[L[0]];
+      if (a >= a0 && a < a1) return [i, j, (a - a0) / (a1 - a0)];
     }
-    return [0, 1, 0];
+    return [L[0], L[1], 0];
   }
 
   // v: { x, y, scale (px del canvas per px della foto), roll (rad), angle (gradi), W, H }
@@ -307,6 +354,8 @@ function createGoggle3D(canvas) {
     const a = ((v.angle % 360) + 360) % 360;
     const [i, j, f] = pairAt(a);
     const w = v.forceW ?? f * f * (3 - 2 * f);
+    const [i2, j2, f2] = pairAt(a, true);
+    const w2 = v.forceW ?? f2 * f2 * (3 - 2 * f2);
     const off = [C.offs[i][0] * (1 - f) + C.offs[j][0] * f, C.offs[i][1] * (1 - f) + C.offs[j][1] * f];
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, v.W, v.H);
@@ -328,6 +377,14 @@ function createGoggle3D(canvas) {
     gl.uniform1f(L.uLayerA, i);
     gl.uniform1f(L.uLayerB, j);
     gl.uniform1f(L.uW, w);
+    gl.uniformMatrix3fv(L.uRA2, false, rot(C.angles[i2]));
+    gl.uniformMatrix3fv(L.uRB2, false, rot(C.angles[j2]));
+    gl.uniform2fv(L.uOffA2, C.offs[i2]);
+    gl.uniform2fv(L.uOffB2, C.offs[j2]);
+    gl.uniform1f(L.uLayerA2, i2);
+    gl.uniform1f(L.uLayerB2, j2);
+    gl.uniform1f(L.uW2, w2);
+    gl.uniform1f(L.uFlow2, i2 === i && j2 === j ? 1 : 0);
     gl.uniform1f(L.uPair, i);
     gl.uniform1f(L.uFlowOn, flowOn && !v.noFlow ? 1 : 0);
     gl.uniform1f(L.uDebug, +v.debug || 0);

@@ -337,14 +337,14 @@ function init() {
   gsap.registerPlugin(ScrollTrigger);
   stage.classList.add('is-pinned');
   g3d = window.createGoggle3D ? createGoggle3D(canvas) : null;
-  if (g3d) meshFile = fetch('assets/goggle.bin').then((r) => { if (!r.ok) throw new Error('goggle.bin ' + r.status); return r.arrayBuffer(); });
+  if (g3d) meshFile = fetch('assets/goggle.bin?v=6').then((r) => { if (!r.ok) throw new Error('goggle.bin ' + r.status); return r.arrayBuffer(); });
   if (meshFile) meshFile.catch(() => {}); // l'errore si gestisce dove si aspetta il file
   // spostamento dei dettagli tra foto vicine: se manca, il 3D funziona lo stesso (con dissolvenza semplice)
   if (g3d) flowFile = new Promise((resolve) => {
     const img = new Image();
     img.onload = () => img.decode().then(() => resolve(img), () => resolve(img));
     img.onerror = () => resolve(null);
-    img.src = 'assets/flow.png';
+    img.src = 'assets/flow.png?v=6';
   });
   else ctx = canvas.getContext('2d');
 
