@@ -1,19 +1,21 @@
-// ───── La scena: 12 foto reali della maschera (una ogni 30°) disegnate in tempo reale ─────
+// ───── La scena: 12 foto reali della maschera (circa una ogni 30°) disegnate in tempo reale ─────
 // Niente video pre-calcolato: a ogni aggiornamento dello schermo la maschera viene ridisegnata
 // esattamente dove la porta lo scroll, quindi il movimento è continuo.
 // Le misure sono in pixel di una tela virtuale (1920×1080 desktop, 960×1440 mobile) adattata
 // allo schermo in modalità "cover".
 const SCENE = {
   dir: 'assets/views/',
-  views: 12, // view_00 … view_11 = 0°, 30°, … 330°
+  views: 12, // view_00 … view_11, circa una ogni 30° (angoli esatti in GOGGLE_CAM.angles)
   hero: 'view_hi', // stessa posa di view_11 a risoluzione più alta, per l'apertura
   heroSwap: [0.11, 0.14], // dove la foto grande lascia il posto a view_11
   margin: 4, // px trasparenti attorno alla sagoma in ogni foto
   fade: [0.42, 0.58], // dentro ogni passo di 30°: tiene la vista, sfuma, tiene la successiva
   frame: { desktop: [1920, 1080], mobile: [960, 1440] },
-  // [p, angolo°]: cresce = la maschera gira
-  angle: [[0, 330], [0.10, 330], [0.18, 360], [0.35, 720], [0.40, 720], [0.47, 750], [0.52, 750], [0.58, 870],
-    [0.63, 870], [0.70, 900], [0.72, 900], [0.78, 990], [0.82, 990], [0.90, 1020], [1, 1020]],
+  // [p, angolo°]: cresce = la maschera gira. Le pause stanno sugli angoli esatti delle foto (GOGGLE_CAM.angles),
+  // così da fermi si vede sempre una foto vera; i punti di STOPS cadono dentro le pause.
+  angle: [[0, 327.97], [0.10, 327.97], [0.18, 360], [0.35, 720], [0.40, 720], [0.44, 753.03], [0.52, 753.03],
+    [0.58, 871.29], [0.66, 871.29], [0.71, 900.2], [0.73, 900.2], [0.79, 986.62], [0.83, 986.62], [0.87, 1015.86],
+    [1, 1015.86]],
   // [p, altezza a schermo (px della tela), spostamento x, spostamento y (frazioni della tela)]
   place: {
     desktop: [[0, 520, 0.16, -0.10], [0.06, 490, 0.12, -0.08], [0.12, 372, 0.07, -0.05], [0.18, 370, 0, -0.02],
@@ -53,8 +55,13 @@ const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const stage = document.querySelector('.stage');
 const pin = stage.querySelector('.pin');
-const canvas = stage.querySelector('.video');
-const ctx = canvas.getContext('2d');
+let canvas = stage.querySelector('.video');
+let ctx = null; // disegno 2D, se il 3D non è disponibile
+let g3d = null; // maschera 3D (js/goggle3d.js)
+let g3dReady = false;
+let meshFile = null;
+let flowFile = null;
+const REF_H = 405; // altezza in px della sagoma frontale nelle foto: fa da metro per la scala del 3D
 const off = document.createElement('canvas'); // qui si fondono due foto durante una dissolvenza
 const offCtx = off.getContext('2d');
 const blocks = [...stage.querySelectorAll('.block')];
@@ -207,10 +214,15 @@ function draw(force) {
   bg.snow.style.opacity = 1 - dark;
   blobStyle(bg.shade, x / d, (y + hd * 0.62 * k) / d, dw * 0.48 * k / d, dw * 0.09 * k / d, 0.22 * (1 - dark));
   blobStyle(bg.glow, x / d, y / d, dw * 0.95 * 1.8 * k / d, dw * 0.55 * 1.8 * k / d, dark);
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  if (dirty) ctx.clearRect(...dirty);
-  else ctx.clearRect(0, 0, canvas.width, canvas.height);
-  dirty = paintMask(ctx, s);
+  if (g3dReady) {
+    const [angle] = at(SCENE.angle, progress);
+    g3d.draw({ x, y, scale: hd * k / REF_H, roll: s.roll, angle, W: canvas.width, H: canvas.height });
+  } else if (ctx) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (dirty) ctx.clearRect(...dirty);
+    else ctx.clearRect(0, 0, canvas.width, canvas.height);
+    dirty = paintMask(ctx, s);
+  }
   painted = progress;
 }
 
@@ -246,6 +258,20 @@ async function loadViews() {
   views = v.map((x, i) => x || v.find(Boolean) || h);
   hero = h;
   if (!views[0]) return;
+  if (g3d && meshFile) {
+    try {
+      // vista 330°: la foto grande, che il 3D sa già dove mettere
+      g3dReady = g3d.setup([...views.slice(0, SCENE.views - 1).map((x) => x.img), (hero || views[SCENE.views - 1]).img], await meshFile, await flowFile);
+    } catch (err) {
+      console.warn('3D non disponibile, uso le foto in 2D:', err.message);
+    }
+    if (!g3dReady) { // il canvas è già WebGL: per il 2D ne serve uno nuovo
+      const c2 = canvas.cloneNode();
+      canvas.replaceWith(c2);
+      canvas = c2;
+      ctx = canvas.getContext('2d');
+    }
+  }
   resize();
 }
 
@@ -310,6 +336,17 @@ function buildTimeline() {
 function init() {
   gsap.registerPlugin(ScrollTrigger);
   stage.classList.add('is-pinned');
+  g3d = window.createGoggle3D ? createGoggle3D(canvas) : null;
+  if (g3d) meshFile = fetch('assets/goggle.bin').then((r) => { if (!r.ok) throw new Error('goggle.bin ' + r.status); return r.arrayBuffer(); });
+  if (meshFile) meshFile.catch(() => {}); // l'errore si gestisce dove si aspetta il file
+  // spostamento dei dettagli tra foto vicine: se manca, il 3D funziona lo stesso (con dissolvenza semplice)
+  if (g3d) flowFile = new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => img.decode().then(() => resolve(img), () => resolve(img));
+    img.onerror = () => resolve(null);
+    img.src = 'assets/flow.png';
+  });
+  else ctx = canvas.getContext('2d');
 
   lenis = new Lenis();
   lenis.on('scroll', ScrollTrigger.update);
