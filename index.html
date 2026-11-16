@@ -8,9 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <!-- primo frame subito, per la serie giusta -->
-  <link rel="preload" as="image" href="assets/frames/desktop/0001.webp" media="(min-width: 769px)">
-  <link rel="preload" as="image" href="assets/frames/mobile/0001.webp" media="(max-width: 768px)">
+  <!-- la foto dell'apertura subito -->
+  <link rel="preload" as="image" href="assets/views/view_hi.webp">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -29,6 +28,11 @@
   <main>
     <section class="stage" id="top" aria-label="La maschera">
       <div class="pin">
+        <div class="scene-bg" aria-hidden="true">
+          <div class="scene-bg__snow"></div>
+          <div class="scene-bg__shade"></div>
+          <div class="scene-bg__glow"></div>
+        </div>
         <canvas class="video" aria-hidden="true"></canvas>
 
         <div class="hero">
@@ -97,7 +101,7 @@
         <h2 class="buy__title" id="t-buy"><span>Leggi la neve.</span><br><span class="grad-text">Scegli la linea.</span></h2>
       </div>
       <div class="card">
-        <img src="assets/product.webp" width="1221" height="702" loading="lazy" alt="Maschera Oakley Flow Scape M Mikaela Shiffrin Signature: montatura blu notte, lente a specchio azzurra e cinghia blu e rosa con scritta Oakley">
+        <img src="assets/views/view_hi.webp" width="1181" height="662" loading="lazy" alt="Maschera Oakley Flow Scape M Mikaela Shiffrin Signature: montatura blu notte, lente a specchio azzurra e cinghia blu e rosa con scritta Oakley">
         <div class="card__foot">
           <p class="card__price">€ 395</p>
           <button class="pill mono" type="button">Add to cart</button>
