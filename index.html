@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Oakley Flow Scape M</title>
+  <meta name="description" content="Pagina dimostrativa non ufficiale della maschera da sci Oakley Flow Scape™ M Mikaela Shiffrin Signature.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <!-- primo frame subito, per la serie giusta -->
+  <link rel="preload" as="image" href="assets/frames/desktop/0001.webp" media="(min-width: 769px)">
+  <link rel="preload" as="image" href="assets/frames/mobile/0001.webp" media="(max-width: 768px)">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="nav">
+    <a class="nav__brand mono" href="#top">Oakley</a>
+    <nav aria-label="Caratteristiche">
+      <ul class="nav__links">
+        <li><a href="#lente" data-at="0.45">Lente</a></li>
+        <li><a href="#comfort" data-at="0.65">Comfort</a></li>
+        <li><a href="#switchlock" data-at="0.86">Switchlock</a></li>
+      </ul>
+    </nav>
+    <a class="nav__cart mono" href="#acquista">+ Cart (<span class="cart-count">0</span>)</a>
+  </header>
+
+  <main>
+    <section class="stage" id="top" aria-label="La maschera">
+      <div class="pin">
+        <canvas class="video" aria-hidden="true"></canvas>
+
+        <div class="hero">
+          <div class="hero__main">
+            <p class="tag mono">Model OO7147 — Flow Scape™ M</p>
+            <h1 class="brand">Oakley<sup>®</sup></h1>
+            <p class="hero__slogan">Ogni dettaglio della pista,<br>anche quando la luce cala.</p>
+          </div>
+          <div class="hero__side">
+            <p>Edizione Mikaela Shiffrin Signature: lente conica Prizm™ Snow Sapphire Iridium, con la seconda lente Prizm™ Snow Iced già nella confezione.</p>
+            <p class="tag mono">(Shiffrin Signature) (Inverno 25/26)</p>
+          </div>
+        </div>
+
+        <p class="counter mono" aria-hidden="true">
+          <span class="counter__now"><span>01</span><span>02</span><span>03</span></span>
+          <span class="counter__line"></span>
+          <span>03</span>
+        </p>
+
+        <article class="block block--1" id="lente" aria-labelledby="t-lente">
+          <div class="mask"><div class="mask__in">
+            <span class="block__line"></span>
+            <h2 class="sr-only" id="t-lente">Lente</h2>
+            <p class="block__text">Lente conica a strato singolo, con l'antiappannante laminato direttamente sulla lente: meno distorsioni e il 60% di campo visivo in più rispetto alla Line Miner.</p>
+          </div></div>
+          <dl class="specs">
+            <div><dt>Lente</dt><dd>Prizm™ Snow Sapphire Iridium</dd></div>
+            <div><dt>Categoria</dt><dd>S3 · VLT 13%</dd></div>
+            <div><dt>Luce</dt><dd>Sole e nuvole</dd></div>
+          </dl>
+        </article>
+
+        <article class="block block--2" id="comfort" aria-labelledby="t-comfort">
+          <div class="mask"><div class="mask__in">
+            <span class="block__line"></span>
+            <h2 class="sr-only" id="t-comfort">Comfort</h2>
+            <p class="block__text">Calzata media, pensata per visi più piccoli o caschi a profilo basso. La schiuma Vision Rapt, modellata in 3D, appoggia senza punti di pressione.</p>
+          </div></div>
+          <dl class="specs">
+            <div><dt>Calzata</dt><dd>Media (M)</dd></div>
+            <div><dt>Schiuma</dt><dd>Vision Rapt 3D</dd></div>
+            <div><dt>Montatura</dt><dd>Bio-resina riciclata</dd></div>
+          </dl>
+        </article>
+
+        <article class="block block--3" id="switchlock" aria-labelledby="t-switchlock">
+          <div class="mask"><div class="mask__in">
+            <span class="block__line"></span>
+            <h2 class="sr-only" id="t-switchlock">Switchlock</h2>
+            <p class="block__text">Cambio lente Switchlock™: due agganci meccanici, niente magneti. La seconda lente per neve e cielo coperto è già nella confezione.</p>
+          </div></div>
+          <dl class="specs">
+            <div><dt>Seconda lente</dt><dd>Prizm™ Snow Iced Iridium</dd></div>
+            <div><dt>Categoria</dt><dd>S2 · VLT 38%</dd></div>
+            <div><dt>Inclusi</dt><dd>Custodia e microbag</dd></div>
+          </dl>
+        </article>
+      </div>
+    </section>
+
+    <!-- Prezzo: listino Oakley Europa per W0OO7147SMS (395 €) -->
+    <section class="buy" id="acquista" aria-labelledby="t-buy">
+      <div class="buy__copy">
+        <p class="tag mono">Flow Scape™ M — Mikaela Shiffrin Signature</p>
+        <h2 class="buy__title" id="t-buy"><span>Leggi la neve.</span><br><span class="grad-text">Scegli la linea.</span></h2>
+      </div>
+      <div class="card">
+        <img src="assets/product.webp" width="1221" height="702" loading="lazy" alt="Maschera Oakley Flow Scape M Mikaela Shiffrin Signature: montatura blu notte, lente a specchio azzurra e cinghia blu e rosa con scritta Oakley">
+        <div class="card__foot">
+          <p class="card__price">€ 395</p>
+          <button class="pill mono" type="button">Add to cart</button>
+        </div>
+        <p class="card__status mono" role="status"></p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer mono">© 2026 · pagina dimostrativa non ufficiale, non affiliata a Oakley</footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script src="https://unpkg.com/lenis@1.1.14/dist/lenis.min.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
