@@ -2,7 +2,7 @@
 // Per usare un video vero: estrai i frame in queste cartelle con gli stessi nomi (0001.webp …)
 // e aggiorna count. I frame seguono lo scroll in modo lineare dall'inizio alla fine dello stage.
 const FRAMES = {
-  count: 180,
+  count: 280,
   desktop: 'assets/frames/desktop/',
   mobile: 'assets/frames/mobile/',
   ext: '.webp',
